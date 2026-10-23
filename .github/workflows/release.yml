@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to build (needs a section in CHANGELOG.md)
+        description: Version to build. Choose branch cursor/reader-highlight-shortcut-5206 or tag v1.1.0, not main.
         required: true
 
 permissions:
@@ -69,11 +69,17 @@ jobs:
           retention-days: 90
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            TAG="v${VERSION#v}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            TAG="$GITHUB_REF_NAME"
+          fi
           FLAGS=()
           [[ "$VERSION" == *-* ]] && FLAGS+=(--prerelease)
           shopt -s nullglob
@@ -84,4 +90,4 @@ jobs:
             echo "::error::no release assets in dist/"
             exit 1
           fi
-          gh release create "$GITHUB_REF_NAME" --title "Folio $VERSION" --notes-file dist/release-notes.md "${FLAGS[@]}" "${ASSETS[@]}"
+          gh release create "$TAG" --title "Folio $VERSION" --notes-file dist/release-notes.md "${FLAGS[@]}" "${ASSETS[@]}"
