@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to package, for example 1.1.1. The run checks out that tag.
+        description: Version to package, for example 1.1.2. The run checks out that tag.
         required: true
 
 permissions:
