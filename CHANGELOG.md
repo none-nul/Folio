@@ -6,6 +6,23 @@
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-23
+
+### 修复
+
+- 修复安装后一打开就退出：应用的临时签名和内置 Sparkle 的签名不是同一个 Team ID，系统拒绝加载更新组件
+
+## [1.1.1] - 2026-10-23
+
+### 新增
+
+- 阅读器：选中文字后按快捷键再高亮（默认 ⇧⌘H，可在「设置 ▸ 阅读」或欢迎页更改），方便先复制去查资料；对照阅读时同一处会同时标在原文和译文上，译文也可以单独批注
+- 阅读器工具栏在窗口变窄（例如分屏）时优先保留批注工具，搜索框先让位
+
+### 变更
+
+- 应用内更新换用新的签名密钥，更新源改为 `none-nul/Folio` 的 Release。已经安装的 1.0.0 需要手动安装这一版 DMG
+
 ## [1.0.0] - 2026-10-15
 
 首个公开版本。
@@ -25,5 +42,7 @@
 - 中英双语界面（默认跟随系统语言，可在设置中切换），浏览器插件同样支持英文
 - 支持 macOS 14 Sonoma 及以上；在 macOS 26 上使用 Liquid Glass 外观
 
-[Unreleased]: https://github.com/Alonemo-Nnqc/Folio/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/none-nul/Folio/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/none-nul/Folio/releases/tag/v1.1.2
+[1.1.1]: https://github.com/none-nul/Folio/releases/tag/v1.1.1
 [1.0.0]: https://github.com/Alonemo-Nnqc/Folio/releases/tag/v1.0.0

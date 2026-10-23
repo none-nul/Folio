@@ -77,6 +77,7 @@ final class AppSettings {
         static let readerLayout = "readerLayout"
         static let reopenReaderTabs = "reopenReaderTabs"
         static let highlightColor = "highlightColor"
+        static let highlightShortcut = HighlightShortcut.defaultsKey
         static let useZoteroRecognizer = "useZoteroRecognizer"
         static let translationService = "translationService"
         static let translationFields = "translationFields"
@@ -115,6 +116,14 @@ final class AppSettings {
     var reopenReaderTabs: Bool { didSet { save(reopenReaderTabs, Key.reopenReaderTabs) } }
     /// Name of the default highlight colour (see AnnotationColor).
     var highlightColor: String { didSet { save(highlightColor, Key.highlightColor) } }
+    /// Keystroke that highlights the current selection. The default is ⇧⌘H.
+    var highlightShortcut: HighlightShortcut {
+        didSet {
+            save(highlightShortcut.storage, Key.highlightShortcut)
+            HighlightShortcut.current = highlightShortcut
+            ReaderMenus.apply(highlightShortcut)
+        }
+    }
     var useZoteroRecognizer: Bool { didSet { save(useZoteroRecognizer, Key.useZoteroRecognizer) } }
     /// Translation service id from `TranslationServiceCatalog` (TRANS-03).
     var translationService: String { didSet { save(translationService, Key.translationService) } }
@@ -177,6 +186,7 @@ final class AppSettings {
             Key.readerLayout: ReaderLayout.single.rawValue,
             Key.reopenReaderTabs: true,
             Key.highlightColor: "yellow",
+            Key.highlightShortcut: HighlightShortcut.default.storage,
             Key.useZoteroRecognizer: true,
             Key.markReadingOnOpen: true,
             Key.readerPageShadows: true,
@@ -196,6 +206,8 @@ final class AppSettings {
         readerLayout = ReaderLayout(rawValue: defaults.string(forKey: Key.readerLayout) ?? "") ?? .single
         reopenReaderTabs = defaults.bool(forKey: Key.reopenReaderTabs)
         highlightColor = defaults.string(forKey: Key.highlightColor) ?? "yellow"
+        let shortcut = HighlightShortcut.stored(in: defaults)
+        highlightShortcut = shortcut
         useZoteroRecognizer = defaults.bool(forKey: Key.useZoteroRecognizer)
         translationService = defaults.string(forKey: Key.translationService) ?? TranslationServiceCatalog.defaultServiceID
         translationFields = defaults.dictionary(forKey: Key.translationFields) as? [String: [String: String]] ?? [:]
@@ -220,6 +232,7 @@ final class AppSettings {
             forName: AgentConfiguration.preferencesDidChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.reloadExternalChanges() }
         }
+        HighlightShortcut.current = shortcut
     }
 
     @ObservationIgnored private var preferencesObserver: (any NSObjectProtocol)?

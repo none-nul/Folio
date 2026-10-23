@@ -74,7 +74,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nnqc.Folio
         PRODUCT_NAME: Folio
-        MARKETING_VERSION: "1.0.0"
+        MARKETING_VERSION: "1.1.2"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_FILE: Folio/Info.plist
         CODE_SIGN_ENTITLEMENTS: Folio/Folio.entitlements
@@ -120,7 +120,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.nnqc.Folio.SafariExtension
         INFOPLIST_FILE: SafariExtension/Info.plist
         CODE_SIGN_ENTITLEMENTS: SafariExtension/SafariExtension.entitlements
-        MARKETING_VERSION: "1.0.0"
+        MARKETING_VERSION: "1.1.2"
         CURRENT_PROJECT_VERSION: "1"
         SKIP_INSTALL: YES
   folio-cli:
@@ -147,6 +147,8 @@ targets:
       - path: Folio/App/CitationStyleOption.swift
       - path: Folio/Support/AppKitExtensions.swift
       - path: Folio/Services/CitationService.swift
+      - path: Folio/Reader/ReaderState.swift
+      - path: Folio/Reader/AnnotationColor.swift
     dependencies:
       - package: FolioCore
         product: FolioCore

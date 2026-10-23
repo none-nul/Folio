@@ -13,6 +13,9 @@ final class AnnotationEditor: NSObject, NSPopoverDelegate {
     /// "添加到笔记" / "拷贝为引用" for a text selection (READER-08).
     var onAddToNote: (String, Int) -> Void = { _, _ in }
     var onCopyAsCitation: (String, Int) -> Void = { _, _ in }
+    /// When it returns true, the selection menu does not also create the markup here.
+    /// The reader uses this so a highlight in 对照阅读 is copied onto the other pane.
+    var onMarkup: ((PDFAnnotationSubtype, PDFSelection) -> Bool)?
     private var editing: (annotation: PDFAnnotation, textView: NSTextView, isNew: Bool, original: String?)?
 
     init(state: ReaderState) {
@@ -45,7 +48,18 @@ final class AnnotationEditor: NSObject, NSPopoverDelegate {
             added.append(annotation)
             add(annotation, to: page)
         }
-        if added.count > 1 { undoManager?.setActionName(String(localized: "添加\(state.tool.title)")) }
+        if added.count > 1 {
+            let name = if type == .highlight {
+                String(localized: "高亮")
+            } else if type == .underline {
+                String(localized: "下划线")
+            } else if type == .strikeOut {
+                String(localized: "删除线")
+            } else {
+                String(localized: "批注")
+            }
+            undoManager?.setActionName(String(localized: "添加\(name)"))
+        }
     }
 
     /// Places a sticky note or a text box where the user clicked, then opens its editor.
@@ -265,8 +279,15 @@ final class AnnotationEditor: NSObject, NSPopoverDelegate {
         for tool in [AnnotationTool.highlight, .underline, .strikeOut] {
             let item = NSMenuItem.closure(tool.title) { [weak self, weak pdfView] in
                 guard let type = tool.markupType else { return }
-                self?.addMarkup(type, for: selection)
+                if self?.onMarkup?(type, selection) != true {
+                    self?.addMarkup(type, for: selection)
+                }
                 pdfView?.clearSelection()
+            }
+            if tool == .highlight {
+                let shortcut = HighlightShortcut.current
+                item.keyEquivalent = shortcut.key
+                item.keyEquivalentModifierMask = NSEvent.ModifierFlags(rawValue: shortcut.modifiers.rawValue)
             }
             item.image = NSImage(systemSymbolName: tool.symbol, accessibilityDescription: nil)
             menu.addItem(item)

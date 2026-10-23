@@ -46,6 +46,21 @@ jobs:
             CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
             -testLanguage en -testRegion US test -only-testing:FolioTests
 
+      # The test step already built Folio.app. Attach it so the run can be downloaded and tried.
+      - name: Zip Folio.app
+        run: |
+          APP="build/DerivedData/Build/Products/Debug/Folio.app"
+          test -d "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" Folio-debug.zip
+
+      - name: Upload Folio.app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Folio-debug
+          path: Folio-debug.zip
+          if-no-files-found: error
+          retention-days: 14
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

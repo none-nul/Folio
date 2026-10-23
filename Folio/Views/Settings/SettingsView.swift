@@ -348,7 +348,7 @@ struct ReadingSettings: View {
                 }
                 Toggle("显示页面阴影", isOn: $settings.readerPageShadows)
             }
-            Section("批注") {
+            Section {
                 LabeledContent("默认高亮颜色") {
                     ColorSwatchRow(hex: Binding(
                         get: { AnnotationColor(rawValue: settings.highlightColor)?.nsColor.hexString },
@@ -359,7 +359,14 @@ struct ReadingSettings: View {
                         }),
                         presets: AnnotationColor.allCases.map { ($0.title, $0.nsColor.hexString) }, allowsCustom: false)
                 }
+                LabeledContent("高亮快捷键") {
+                    HighlightShortcutControls(settings: settings)
+                }
                 TextField("批注作者", text: $settings.annotationAuthor, prompt: Text(NSFullUserName()))
+            } header: {
+                Text("批注")
+            } footer: {
+                Text("选中文字后按这个快捷键高亮。需要包含 ⌘ 或 ⌃，且不能和菜单里已有的快捷键相同。")
             }
         }
         .formStyle(.grouped)
