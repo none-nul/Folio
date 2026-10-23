@@ -42,7 +42,8 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         self.fileId = fileId
         itemId = file.itemId
         fileURL = model.fileURL(file)
-        state = ReaderState(color: AnnotationColor(rawValue: model.settings.highlightColor) ?? .yellow)
+        state = ReaderState(color: AnnotationColor(rawValue: model.settings.highlightColor) ?? .yellow,
+                             highlightShortcutLabel: model.settings.highlightShortcut.display)
         editor = AnnotationEditor(state: state)
         parallelEditor = AnnotationEditor(state: state)
         content = ReaderContentViewController(pdfView: pdfView)
@@ -159,6 +160,12 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             self.pdfView.inkColor = color.nsColor
             self.content.parallelView?.inkColor = color.nsColor
             self.colorItem?.image = Self.colorSwatch(color)
+        })
+        observers.append(ObservationLoop { [weak self] in
+            guard let self else { return }
+            let display = self.model.settings.highlightShortcut.display
+            self.state.highlightShortcutLabel = display
+            self.applyHighlightTooltip(display)
         })
     }
 
@@ -745,8 +752,8 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         state.tool = state.tool == tool && sender is NSMenuItem ? .select : tool
     }
 
-    /// ⇧⌘H. Marks the focused pane's selection. During 对照阅读 the same lines are also marked
-    /// on the other pane, because the translation keeps the original layout.
+    /// The highlight shortcut (⇧⌘H unless the reader changed it). Marks the focused pane's selection.
+    /// During 对照阅读 the same lines are also marked on the other pane, because the translation keeps the original layout.
     @objc func highlightSelection(_ sender: Any?) {
         guard let view = readerViewForMarkup(), let selection = view.currentSelection else { return }
         applyHighlight(selection, in: view)
@@ -886,6 +893,13 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         }
     }
 
+    private func applyHighlightTooltip(_ display: String) {
+        guard let group = toolGroup else { return }
+        let index = AnnotationTool.highlight.rawValue
+        guard group.subitems.indices.contains(index) else { return }
+        group.subitems[index].toolTip = String(format: String(localized: "高亮所选文字（%@）"), display)
+    }
+
     // MARK: Toolbar
 
     func configureToolbar() {
@@ -927,16 +941,15 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             group.label = String(localized: "批注工具")
             group.paletteLabel = String(localized: "批注工具")
             group.selectedIndex = state.tool.rawValue
-            for (index, tool) in tools.enumerated() {
-                group.subitems[index].toolTip = tool == .highlight
-                    ? String(localized: "高亮所选文字（⇧⌘H）")
-                    : String(localized: "\(tool.title)（⌃⌘\(tool.keyEquivalent.uppercased())）")
+            for (index, tool) in tools.enumerated() where tool != .highlight {
+                group.subitems[index].toolTip = String(localized: "\(tool.title)（⌃⌘\(tool.keyEquivalent.uppercased())）")
             }
             group.controlRepresentation = .expanded
             // A wide group used to jump into the overflow menu as soon as it no longer fit whole,
             // leaving empty flexible space in a split window. Keep the tools and let search yield first.
             group.visibilityPriority = .high
             toolGroup = group
+            applyHighlightTooltip(state.highlightShortcutLabel)
             return group
         case .readerColor:
             let menu = NSMenu()

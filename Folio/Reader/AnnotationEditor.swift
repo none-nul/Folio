@@ -284,6 +284,11 @@ final class AnnotationEditor: NSObject, NSPopoverDelegate {
                 }
                 pdfView?.clearSelection()
             }
+            if tool == .highlight {
+                let shortcut = HighlightShortcut.current
+                item.keyEquivalent = shortcut.key
+                item.keyEquivalentModifierMask = NSEvent.ModifierFlags(rawValue: shortcut.modifiers.rawValue)
+            }
             item.image = NSImage(systemSymbolName: tool.symbol, accessibilityDescription: nil)
             menu.addItem(item)
         }

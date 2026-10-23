@@ -8275,6 +8275,126 @@
         }
       }
     },
+    "按下以设置高亮快捷键" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to set the highlight shortcut"
+          }
+        }
+      }
+    },
+    "按下新的快捷键，Esc 取消" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press the new shortcut. Esc cancels."
+          }
+        }
+      }
+    },
+    "恢复默认" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Default"
+          }
+        }
+      }
+    },
+    "这个按键不能用作快捷键" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That key can’t be a shortcut"
+          }
+        }
+      }
+    },
+    "这个快捷键已被「%@」使用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This shortcut is already used by “%@”"
+          }
+        }
+      }
+    },
+    "空格" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Space"
+          }
+        }
+      }
+    },
+    "请按下快捷键" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press a shortcut"
+          }
+        }
+      }
+    },
+    "选中文字后按 %@ 高亮，或用工具栏的下划线、便签等工具添加批注" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select text and press %@ to highlight, or use underline, notes and the other toolbar tools"
+          }
+        }
+      }
+    },
+    "选中文字后按这个快捷键高亮。需要包含 ⌘ 或 ⌃，且不能和菜单里已有的快捷键相同。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlight the selected text with this shortcut. It must include ⌘ or ⌃ and must not match another menu command."
+          }
+        }
+      }
+    },
+    "快捷键需要包含 ⌘ 或 ⌃" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The shortcut must include ⌘ or ⌃"
+          }
+        }
+      }
+    },
+    "高亮快捷键" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlight Shortcut"
+          }
+        }
+      }
+    },
+    "高亮所选文字（%@）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlight the selection (%@)"
+          }
+        }
+      }
+    },
     "；文献库中有 %lld 个条目" : {
       "localizations" : {
         "en" : {

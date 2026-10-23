@@ -50,7 +50,10 @@ enum ReaderMenus {
             annotate.addItem(entry)
             if tool == .select { annotate.addItem(.separator()) }
         }
-        let highlight = item(String(localized: "高亮所选文字"), #selector(ReaderWindowController.highlightSelection(_:)), "h", [.command, .shift])
+        let shortcut = HighlightShortcut.current
+        let highlight = item(String(localized: "高亮所选文字"), #selector(ReaderWindowController.highlightSelection(_:)),
+                             shortcut.key, NSEvent.ModifierFlags(rawValue: shortcut.modifiers.rawValue))
+        highlight.identifier = highlightItemIdentifier
         highlight.image = NSImage(systemSymbolName: AnnotationTool.highlight.symbol, accessibilityDescription: nil)
         annotate.insertItem(highlight, at: 2)
         annotate.addItem(.separator())
@@ -66,5 +69,42 @@ enum ReaderMenus {
         annotate.addItem(item(String(localized: "添加到笔记"), #selector(ReaderWindowController.addSelectionToNote(_:)), "m", [.command, .control]))
         annotate.addItem(item(String(localized: "删除所选批注"), #selector(ReaderWindowController.deleteSelectedAnnotation(_:)), "", .command))
         return [(String(localized: "前往"), go), (String(localized: "批注"), annotate)]
+    }
+
+    static let highlightItemIdentifier = NSUserInterfaceItemIdentifier("folio.highlightSelection")
+
+    /// Points the 批注 menu item at the shortcut. No menu yet (during launch) is fine.
+    static func apply(_ shortcut: HighlightShortcut) {
+        guard let item = menuItem(highlightItemIdentifier, in: NSApp.mainMenu) else { return }
+        item.keyEquivalent = shortcut.key
+        item.keyEquivalentModifierMask = NSEvent.ModifierFlags(rawValue: shortcut.modifiers.rawValue)
+    }
+
+    /// Title of another menu command that already uses this shortcut.
+    static func reservedTitle(matching shortcut: HighlightShortcut) -> String? {
+        guard let menu = NSApp.mainMenu else { return nil }
+        return shortcut.conflictingTitle(among: claims(in: menu, excluding: highlightItemIdentifier))
+    }
+
+    private static func menuItem(_ identifier: NSUserInterfaceItemIdentifier, in menu: NSMenu?) -> NSMenuItem? {
+        guard let menu else { return nil }
+        for item in menu.items {
+            if item.identifier == identifier { return item }
+            if let submenu = item.submenu, let found = menuItem(identifier, in: submenu) { return found }
+        }
+        return nil
+    }
+
+    private static func claims(in menu: NSMenu, excluding identifier: NSUserInterfaceItemIdentifier) -> [HighlightShortcut.Claim] {
+        var result: [HighlightShortcut.Claim] = []
+        for item in menu.items {
+            if item.identifier != identifier, !item.keyEquivalent.isEmpty {
+                result.append(.init(key: item.keyEquivalent,
+                                    modifiers: HighlightShortcut.Modifiers(rawValue: item.keyEquivalentModifierMask.rawValue),
+                                    title: item.title))
+            }
+            if let submenu = item.submenu { result += claims(in: submenu, excluding: identifier) }
+        }
+        return result
     }
 }

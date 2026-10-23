@@ -63,7 +63,7 @@ struct ReaderSidebarView: View {
         case .annotations:
             if state.annotations.isEmpty {
                 ContentUnavailableView("没有批注", systemImage: "highlighter",
-                                       description: Text("选中文字后按 ⇧⌘H 高亮，或用工具栏的下划线、便签等工具添加批注"))
+                                       description: Text(verbatim: String(format: String(localized: "选中文字后按 %@ 高亮，或用工具栏的下划线、便签等工具添加批注"), state.highlightShortcutLabel)))
             } else {
                 List(state.annotations) { row in
                     Button { actions.showAnnotation(row.id) } label: { AnnotationRowView(row: row) }

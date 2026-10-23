@@ -152,10 +152,10 @@ private struct WelcomePage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 24)
+            Spacer(minLength: 8)
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .frame(width: 112, height: 112)
+                .frame(width: 88, height: 88)
             Text("欢迎使用 Folio")
                 .font(.largeTitle.weight(.bold))
                 .padding(.top, 10)
@@ -174,8 +174,24 @@ private struct WelcomePage: View {
                 }
             }
             .frame(maxWidth: 580)
-            .padding(.top, 34)
-            Spacer(minLength: 24)
+            .padding(.top, 22)
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("高亮快捷键").font(.headline)
+                    Text("选中文字后按这个快捷键高亮。需要包含 ⌘ 或 ⌃，且不能和菜单里已有的快捷键相同。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                HighlightShortcutControls(settings: state.model.settings)
+                    .fixedSize()
+            }
+            .padding(16)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .frame(maxWidth: 580)
+            .padding(.top, 18)
+            Spacer(minLength: 16)
             Text("接下来用一分钟完成几项设置，每一步都可以跳过，之后也能在设置中更改。")
                 .font(.callout)
                 .foregroundStyle(.secondary)
