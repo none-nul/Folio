@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to build. Choose branch cursor/reader-highlight-shortcut-5206 or tag v1.1.0, not main.
+        description: Version to package, for example 1.1.0. The run checks out that tag.
         required: true
 
 permissions:
@@ -21,9 +21,25 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 60
     steps:
+      # The Actions button checks out whichever branch is selected. Package the
+      # version tag instead, so a run started from main still contains that release.
+      - name: Choose the commit to package
+        id: package
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            VERSION="${VERSION#v}"
+            echo "ref=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "Packaging tag v${VERSION}"
+          else
+            echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "Packaging ${GITHUB_SHA}"
+          fi
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the build number is the commit count
+          ref: ${{ steps.package.outputs.ref }}
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
