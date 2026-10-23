@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-23
+
+### 修复
+
+- 修复安装后一打开就退出：应用的临时签名和内置 Sparkle 的签名不是同一个 Team ID，系统拒绝加载更新组件
+
 ## [1.1.1] - 2026-10-23
 
 ### 新增
@@ -36,6 +42,7 @@
 - 中英双语界面（默认跟随系统语言，可在设置中切换），浏览器插件同样支持英文
 - 支持 macOS 14 Sonoma 及以上；在 macOS 26 上使用 Liquid Glass 外观
 
-[Unreleased]: https://github.com/none-nul/Folio/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/none-nul/Folio/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/none-nul/Folio/releases/tag/v1.1.2
 [1.1.1]: https://github.com/none-nul/Folio/releases/tag/v1.1.1
 [1.0.0]: https://github.com/Alonemo-Nnqc/Folio/releases/tag/v1.0.0

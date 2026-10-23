@@ -44,6 +44,26 @@ if [[ $BUILD_STATUS -ne 0 || ! -d "$APP" ]]; then
   echo "build failed (full log: $DERIVED.log)" >&2
   exit 1
 fi
+
+# Sparkle.framework arrives signed with Sparkle's Team ID. This app is ad-hoc (no Team ID) and
+# has the hardened runtime, so dyld aborts at launch: "different Team IDs". Re-sign the helpers
+# from the inside out, then the app, all with the same ad-hoc identity. Do not use --deep:
+# Downloader.xpc keeps its own entitlements.
+echo "▶ re-signing Sparkle with the app identity"
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+SPARKLE_B="$SPARKLE/Versions/B"
+sign_adhoc() {
+  local target="$1"
+  shift
+  [[ -e "$target" ]] || return 0
+  codesign --force --sign - --options runtime "$@" "$target"
+}
+sign_adhoc "$SPARKLE_B/XPCServices/Installer.xpc"
+sign_adhoc "$SPARKLE_B/XPCServices/Downloader.xpc" --preserve-metadata=entitlements
+sign_adhoc "$SPARKLE_B/Autoupdate"
+sign_adhoc "$SPARKLE_B/Updater.app"
+sign_adhoc "$SPARKLE"
+sign_adhoc "$APP" --entitlements "$ROOT/Folio/Folio.entitlements"
 codesign --verify --deep --strict "$APP"
 
 SPARKLE_BIN="$DERIVED/SourcePackages/artifacts/sparkle/Sparkle/bin"
