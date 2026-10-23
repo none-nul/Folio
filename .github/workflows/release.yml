@@ -2,6 +2,7 @@ name: Release
 
 # Push a tag such as v1.2.0 (matching a "## [1.2.0]" section in CHANGELOG.md) to publish a release.
 # The appcast.xml attached to the newest release is the feed every installed copy of Folio checks.
+# When the Sparkle key is missing, the disk image is still published and appcast.xml is left off.
 on:
   push:
     tags: ['v*']
@@ -37,8 +38,7 @@ jobs:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
         run: |
           if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
-            echo "::error::Secret SPARKLE_ED_PRIVATE_KEY is missing (run script/setup-release-secret.sh)"
-            exit 1
+            echo "::warning::Secret SPARKLE_ED_PRIVATE_KEY is unset. The disk image will be published without an in-app update feed."
           fi
           VERSION="${{ inputs.version }}"
           script/release.sh "${VERSION:-${GITHUB_REF_NAME#v}}"
@@ -60,6 +60,14 @@ jobs:
           name: folio-trial-build
           path: dist/
 
+      - name: Upload the disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Folio-dmg
+          path: dist/Folio-*.dmg
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Publish GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -68,5 +76,12 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           FLAGS=()
           [[ "$VERSION" == *-* ]] && FLAGS+=(--prerelease)
-          gh release create "$GITHUB_REF_NAME" --title "Folio $VERSION" --notes-file dist/release-notes.md "${FLAGS[@]}" \
-            dist/Folio-*.dmg dist/Folio-*.zip dist/appcast.xml dist/folio-chromium-*.zip dist/folio-firefox-*.xpi
+          shopt -s nullglob
+          ASSETS=(dist/Folio-*.dmg dist/Folio-*.zip dist/folio-chromium-*.zip dist/folio-firefox-*.xpi)
+          [[ -f dist/appcast.xml ]] && ASSETS+=(dist/appcast.xml)
+          shopt -u nullglob
+          if [[ ${#ASSETS[@]} -eq 0 ]]; then
+            echo "::error::no release assets in dist/"
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" --title "Folio $VERSION" --notes-file dist/release-notes.md "${FLAGS[@]}" "${ASSETS[@]}"

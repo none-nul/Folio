@@ -10,8 +10,9 @@
 #
 # The app is ad-hoc signed (no Apple Developer Program needed). The archive is signed with the Sparkle
 # EdDSA key: from $SPARKLE_ED_PRIVATE_KEY when set (CI), otherwise from the login keychain (account
-# "Folio", created by Sparkle's generate_keys). Set FOLIO_DOWNLOAD_BASE to point the feed at another
-# server when testing an update locally.
+# "Folio", created by Sparkle's generate_keys). If neither key is available, the DMG and zip are still
+# written and appcast.xml is omitted, so an unsigned feed is never published. Set FOLIO_DOWNLOAD_BASE
+# to point the feed at another server when testing an update locally.
 set -euo pipefail
 
 VERSION="${1:?usage: script/release.sh <version>}"
@@ -59,10 +60,16 @@ hdiutil create -quiet -volname "Folio $VERSION" -srcfolder "$STAGE" -fs HFS+ -fo
 rm -rf "$STAGE"
 
 echo "▶ signing the update"
+SIGNATURE=""
 if [[ -n "${SPARKLE_ED_PRIVATE_KEY:-}" ]]; then
   SIGNATURE=$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$SPARKLE_BIN/sign_update" --ed-key-file - "$ZIP")
+elif SIGNATURE=$("$SPARKLE_BIN/sign_update" --account Folio "$ZIP" 2>"$OUT/sparkle-sign.err"); then
+  rm -f "$OUT/sparkle-sign.err"
 else
-  SIGNATURE=$("$SPARKLE_BIN/sign_update" --account Folio "$ZIP")
+  echo "warning: Sparkle EdDSA key not available; the DMG is packaged without appcast.xml" >&2
+  cat "$OUT/sparkle-sign.err" >&2 || true
+  rm -f "$OUT/sparkle-sign.err"
+  SIGNATURE=""
 fi
 
 echo "▶ release notes and appcast"
@@ -78,6 +85,9 @@ notes = re.sub(r"^\[[^\]]+\]: \S+\s*$", "", notes, flags=re.M).strip()  # link d
 if not notes:
     sys.exit(f"CHANGELOG.md has no section for [{version}]")
 open(f"{out}/release-notes.md", "w", encoding="utf-8").write(notes + "\n")
+if not signature.strip():
+    print("skipped appcast.xml (update archive is not signed)")
+    raise SystemExit(0)
 
 # Minimal Markdown → HTML for Sparkle's release-notes view: ### headings, "- " lists, `code`, **bold**.
 def inline(s):
