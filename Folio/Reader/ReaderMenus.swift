@@ -50,7 +50,7 @@ enum ReaderMenus {
             annotate.addItem(entry)
             if tool == .select { annotate.addItem(.separator()) }
         }
-        let highlight = item(String(localized: "高亮所选文字"), #selector(ReaderWindowController.highlightSelection(_:)), "h", [.command, .control])
+        let highlight = item(String(localized: "高亮所选文字"), #selector(ReaderWindowController.highlightSelection(_:)), "h", [.command, .shift])
         highlight.image = NSImage(systemSymbolName: AnnotationTool.highlight.symbol, accessibilityDescription: nil)
         annotate.insertItem(highlight, at: 2)
         annotate.addItem(.separator())

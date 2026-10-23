@@ -745,7 +745,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         state.tool = state.tool == tool && sender is NSMenuItem ? .select : tool
     }
 
-    /// ⌃⌘H. Marks the focused pane's selection. During 对照阅读 the same lines are also marked
+    /// ⇧⌘H. Marks the focused pane's selection. During 对照阅读 the same lines are also marked
     /// on the other pane, because the translation keeps the original layout.
     @objc func highlightSelection(_ sender: Any?) {
         guard let view = readerViewForMarkup(), let selection = view.currentSelection else { return }
@@ -929,7 +929,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             group.selectedIndex = state.tool.rawValue
             for (index, tool) in tools.enumerated() {
                 group.subitems[index].toolTip = tool == .highlight
-                    ? String(localized: "高亮所选文字（⌃⌘H）")
+                    ? String(localized: "高亮所选文字（⇧⌘H）")
                     : String(localized: "\(tool.title)（⌃⌘\(tool.keyEquivalent.uppercased())）")
             }
             group.controlRepresentation = .expanded

@@ -54,7 +54,7 @@ enum AnnotationTool: Int, CaseIterable {
     }
 
     /// Underline and strike-out mark the selection when the mouse goes up.
-    /// Highlight does not: the selection stays available to copy until ⌃⌘H.
+    /// Highlight does not: the selection stays available to copy until ⇧⌘H.
     var marksSelectionOnMouseUp: Bool {
         switch self {
         case .underline, .strikeOut: true
