@@ -4737,6 +4737,16 @@
         }
       }
     },
+    "无法打开译文" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open the translation"
+          }
+        }
+      }
+    },
     "无法添加「%@」：%@" : {
       "localizations" : {
         "en" : {
@@ -6253,12 +6263,12 @@
         }
       }
     },
-    "用工具栏上的高亮、下划线、便签等工具添加批注" : {
+    "选中文字后按 ⌃⌘H 高亮，或用工具栏的下划线、便签等工具添加批注" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add annotations with the highlight, underline, note and other tools in the toolbar"
+            "value" : "Select text and press ⌃⌘H to highlight, or use underline, notes and the other toolbar tools"
           }
         }
       }
@@ -8095,6 +8105,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Highlight"
+          }
+        }
+      }
+    },
+    "高亮所选文字" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlight Selection"
+          }
+        }
+      }
+    },
+    "高亮所选文字（⌃⌘H）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlight the selection (⌃⌘H)"
           }
         }
       }

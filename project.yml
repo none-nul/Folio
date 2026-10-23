@@ -147,6 +147,8 @@ targets:
       - path: Folio/App/CitationStyleOption.swift
       - path: Folio/Support/AppKitExtensions.swift
       - path: Folio/Services/CitationService.swift
+      - path: Folio/Reader/ReaderState.swift
+      - path: Folio/Reader/AnnotationColor.swift
     dependencies:
       - package: FolioCore
         product: FolioCore

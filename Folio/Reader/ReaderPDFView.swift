@@ -162,7 +162,8 @@ final class ReaderPDFView: PDFView {
             return
         }
         super.mouseUp(with: event)
-        if let type = tool.markupType, let selection = currentSelection, !(selection.string ?? "").isEmpty {
+        // Highlight stays a selection so it can be copied. ⌃⌘H (or the highlight button) marks it.
+        if tool.marksSelectionOnMouseUp, let type = tool.markupType, let selection = currentSelection, !(selection.string ?? "").isEmpty {
             editor?.addMarkup(type, for: selection)
             clearSelection()
         }

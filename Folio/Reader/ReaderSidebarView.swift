@@ -63,7 +63,7 @@ struct ReaderSidebarView: View {
         case .annotations:
             if state.annotations.isEmpty {
                 ContentUnavailableView("没有批注", systemImage: "highlighter",
-                                       description: Text("用工具栏上的高亮、下划线、便签等工具添加批注"))
+                                       description: Text("选中文字后按 ⌃⌘H 高亮，或用工具栏的下划线、便签等工具添加批注"))
             } else {
                 List(state.annotations) { row in
                     Button { actions.showAnnotation(row.id) } label: { AnnotationRowView(row: row) }
@@ -113,7 +113,7 @@ private struct AnnotationRowView: View {
                 .fill(Color(nsColor: row.color.withAlphaComponent(1)))
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(row.kind) · 第 \(row.pageIndex + 1) 页")
+                Text(row.pane.isEmpty ? "\(row.kind) · 第 \(row.pageIndex + 1) 页" : "\(row.pane) · \(row.kind) · 第 \(row.pageIndex + 1) 页")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 if !row.text.isEmpty {

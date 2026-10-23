@@ -11,6 +11,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
     let state: ReaderState
     let pdfView = ReaderPDFView()
     private let editor: AnnotationEditor
+    private let parallelEditor: AnnotationEditor
     private let content: ReaderContentViewController
     private let split = NSSplitViewController()
     private var sidebarItem: NSSplitViewItem!
@@ -26,6 +27,9 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
     private var saveTask: Task<Void, Never>?
     private var positionTask: Task<Void, Never>?
     private var isDirty = false
+    private var parallelDirty = false
+    private var parallelURL: URL?
+    private var parallelKnownModificationDate: Date?
     /// Modification date of the file as last read or written by this reader (to notice outside edits).
     private var knownModificationDate: Date?
     private var restoredPosition = false
@@ -40,6 +44,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         fileURL = model.fileURL(file)
         state = ReaderState(color: AnnotationColor(rawValue: model.settings.highlightColor) ?? .yellow)
         editor = AnnotationEditor(state: state)
+        parallelEditor = AnnotationEditor(state: state)
         content = ReaderContentViewController(pdfView: pdfView)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1200, height: 860),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -74,6 +79,20 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         editor.onChange = { [weak self] in self?.documentChanged() }
         editor.onAddToNote = { [weak self] text, page in self?.addToNote(text, pageIndex: page) }
         editor.onCopyAsCitation = { [weak self] text, page in self?.copyAsCitation(text, pageIndex: page) }
+        parallelEditor.author = editor.author
+        parallelEditor.onChange = { [weak self] in self?.parallelDocumentChanged() }
+        parallelEditor.onAddToNote = editor.onAddToNote
+        parallelEditor.onCopyAsCitation = editor.onCopyAsCitation
+        editor.onMarkup = { [weak self] type, selection in
+            guard let self, type == .highlight else { return false }
+            self.applyHighlight(selection, in: self.pdfView)
+            return true
+        }
+        parallelEditor.onMarkup = { [weak self] type, selection in
+            guard let self, type == .highlight, let view = self.content.parallelView else { return false }
+            self.applyHighlight(selection, in: view)
+            return true
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(pageChanged(_:)), name: .PDFViewPageChanged, object: pdfView)
         NotificationCenter.default.addObserver(self, selector: #selector(scaleChanged(_:)), name: .PDFViewScaleChanged, object: pdfView)
     }
@@ -134,9 +153,11 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             guard let self else { return }
             let tool = self.state.tool
             self.pdfView.tool = tool
+            self.content.parallelView?.tool = tool
             self.toolGroup?.selectedIndex = tool.rawValue
             let color = self.state.color
             self.pdfView.inkColor = color.nsColor
+            self.content.parallelView?.inkColor = color.nsColor
             self.colorItem?.image = Self.colorSwatch(color)
         })
     }
@@ -231,6 +252,15 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
 
     private func documentChanged() {
         isDirty = true
+        noteEdited()
+    }
+
+    private func parallelDocumentChanged() {
+        parallelDirty = true
+        noteEdited()
+    }
+
+    private func noteEdited() {
         window?.isDocumentEdited = true
         refreshAnnotationRows()
         saveTask?.cancel()
@@ -241,30 +271,39 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         }
     }
 
-    /// Writes the document next to the file and swaps it in atomically. Returns false on failure.
+    /// Writes dirty documents next to their files and swaps them in atomically. Returns false on failure.
     @discardableResult
     func save() -> Bool {
         saveTask?.cancel()
-        guard isDirty, let document = pdfView.document else { return true }
-        let temp = fileURL.deletingLastPathComponent().appending(path: ".\(UUID().uuidString).folio-saving.pdf")
+        let original = writeAnnotations(pdfView.document, url: fileURL, dirty: isDirty)
+        isDirty = original.dirty
+        if let date = original.knownDate { knownModificationDate = date }
+        let parallel = writeAnnotations(content.parallelView?.document, url: parallelURL, dirty: parallelDirty)
+        parallelDirty = parallel.dirty
+        if let date = parallel.knownDate { parallelKnownModificationDate = date }
+        if !isDirty && !parallelDirty { window?.isDocumentEdited = false }
+        return original.ok && parallel.ok
+    }
+
+    /// `knownDate` is set only after a successful write, so a skipped clean document does not touch it.
+    private func writeAnnotations(_ document: PDFDocument?, url: URL?, dirty: Bool) -> (ok: Bool, dirty: Bool, knownDate: Date?) {
+        guard dirty, let document, let url else { return (true, dirty, nil) }
+        let temp = url.deletingLastPathComponent().appending(path: ".\(UUID().uuidString).folio-saving.pdf")
         guard document.write(to: temp) else {
             try? FileManager.default.removeItem(at: temp)
             model.toasts.show(String(localized: "无法保存批注：写入文件失败"), systemImage: "exclamationmark.triangle")
-            return false
+            return (false, dirty, nil)
         }
         do {
-            _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: temp)
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: temp)
         } catch {
             try? FileManager.default.removeItem(at: temp)
             model.toasts.show(String(localized: "无法保存批注：\(error.localizedDescription)"), systemImage: "exclamationmark.triangle")
-            return false
+            return (false, dirty, nil)
         }
-        isDirty = false
-        window?.isDocumentEdited = false
-        knownModificationDate = Self.modificationDate(fileURL)
         // Fingerprint, full-text index and the inspector's annotation list follow the file (FILE-08).
         model.importer.refreshChangedFiles()
-        return true
+        return (true, false, Self.modificationDate(url))
     }
 
     /// Picks up edits made in another app (e.g. Preview) while this tab was in the background.
@@ -283,6 +322,19 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
 
     private static func modificationDate(_ url: URL) -> Date? {
         (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+    }
+
+    /// Picks up edits to the open translation (for example from the other pane's save, or Preview).
+    private func reloadParallelIfChangedOnDisk() {
+        guard !parallelDirty, let url = parallelURL, let date = Self.modificationDate(url), date != parallelKnownModificationDate,
+              let view = content.parallelView,
+              let data = try? Data(contentsOf: url, options: .alwaysMapped), let document = PDFDocument(data: data) else { return }
+        let index = view.currentPage.flatMap { view.document?.index(for: $0) }
+        document.delegate = self
+        view.document = document
+        parallelKnownModificationDate = date
+        if let index, let page = document.page(at: index) { view.go(to: page) }
+        refreshAnnotationRows()
     }
 
     // MARK: Reading position (READER-06)
@@ -338,7 +390,13 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
     }
 
     private func refreshAnnotationRows() {
-        guard let document = pdfView.document else { return }
+        var rows = Self.annotationRows(in: pdfView.document, pane: "")
+        rows += Self.annotationRows(in: content.parallelView?.document, pane: String(localized: "译文"))
+        state.annotations = rows
+    }
+
+    private static func annotationRows(in document: PDFDocument?, pane: String) -> [AnnotationRow] {
+        guard let document else { return [] }
         var rows: [AnnotationRow] = []
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { continue }
@@ -346,12 +404,12 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
                 guard let type = annotation.type, ReaderPDFView.editableTypes.contains(type) else { continue }
                 let isMarkup = ["Highlight", "Underline", "StrikeOut", "Squiggly"].contains(type)
                 rows.append(AnnotationRow(id: ObjectIdentifier(annotation), pageIndex: index,
-                                          kind: Self.kindName(type), color: annotation.color,
+                                          kind: kindName(type), color: annotation.color,
                                           text: isMarkup ? AnnotationEditor.text(of: annotation) ?? "" : annotation.contents ?? "",
-                                          comment: isMarkup ? annotation.contents ?? "" : ""))
+                                          comment: isMarkup ? annotation.contents ?? "" : "", pane: pane))
             }
         }
-        state.annotations = rows
+        return rows
     }
 
     private static func kindName(_ type: String) -> String {
@@ -368,14 +426,18 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
     }
 
     private func showAnnotation(_ id: ObjectIdentifier) {
-        guard let document = pdfView.document else { return }
-        for index in 0..<document.pageCount {
-            guard let page = document.page(at: index),
-                  let annotation = page.annotations.first(where: { ObjectIdentifier($0) == id }) else { continue }
-            pdfView.go(to: PDFDestination(page: page, at: NSPoint(x: annotation.bounds.minX, y: annotation.bounds.maxY + 40)))
-            editor.resetTool()
-            pdfView.selectAnnotation(annotation)
-            return
+        let panes: [(ReaderPDFView, AnnotationEditor)] = [(pdfView, editor)] + (content.parallelView.map { [($0, parallelEditor)] } ?? [])
+        for (view, paneEditor) in panes {
+            guard let document = view.document else { continue }
+            for index in 0..<document.pageCount {
+                guard let page = document.page(at: index),
+                      let annotation = page.annotations.first(where: { ObjectIdentifier($0) == id }) else { continue }
+                view.go(to: PDFDestination(page: page, at: NSPoint(x: annotation.bounds.minX, y: annotation.bounds.maxY + 40)))
+                paneEditor.resetTool()
+                view.selectAnnotation(annotation)
+                window?.makeFirstResponder(view)
+                return
+            }
         }
     }
 
@@ -435,6 +497,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
 
     func windowDidBecomeKey(_ notification: Notification) {
         reloadIfChangedOnDisk()
+        reloadParallelIfChangedOnDisk()
     }
 
     func windowDidResignKey(_ notification: Notification) {
@@ -453,6 +516,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         alert.beginSheetModal(for: sender) { [weak self] response in
             if response == .alertSecondButtonReturn {
                 self?.isDirty = false
+                self?.parallelDirty = false
                 sender.close()
             }
         }
@@ -576,22 +640,42 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
 
     @objc func toggleParallelReading(_ sender: Any?) {
         if state.parallelFileId != nil {
+            guard save() else { return }
             state.parallelFileId = nil
+            parallelURL = nil
+            parallelKnownModificationDate = nil
+            parallelEditor.pdfView = nil
             content.showParallel(nil)
+            refreshAnnotationRows()
             return
         }
         guard let translation = translationFile else {
             model.toasts.show(String(localized: "这篇论文还没有译文。可以先\"翻译全文\""), systemImage: "character.book.closed")
             return
         }
+        let url = model.fileURL(translation)
+        guard let data = try? Data(contentsOf: url, options: .alwaysMapped), let document = PDFDocument(data: data) else {
+            model.toasts.show(String(localized: "无法打开译文"), systemImage: "exclamationmark.triangle")
+            return
+        }
+        document.delegate = self
+        guard let view = content.showParallel(document) else { return }
+        view.editor = parallelEditor
+        parallelEditor.pdfView = view
+        view.tool = state.tool
+        view.inkColor = state.color.nsColor
+        view.pageShadowsEnabled = pdfView.pageShadowsEnabled
+        parallelURL = url
+        parallelKnownModificationDate = Self.modificationDate(url)
+        parallelDirty = false
         state.parallelFileId = translation.id
-        content.showParallel(model.fileURL(translation))
         content.syncParallel(from: pdfView)
+        refreshAnnotationRows()
     }
 
     /// Screenshot-free check of 对照阅读: both panes visible and on the same page after paging.
     func logParallelState(to log: String) {
-        let views = content.view.subviews.compactMap { $0 as? PDFView }
+        let views = content.pdfPanes
         var lines = ["panes: \(views.map { Int($0.frame.width) })"]
         pdfView.go(to: pdfView.document!.page(at: 0)!)
         pdfView.goToNextPage(nil)
@@ -638,15 +722,76 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
 
     // MARK: Actions: annotations
 
+    private var suppressToolSelection = false
+
     @objc func selectTool(_ sender: Any?) {
+        if suppressToolSelection { return }
         let index = (sender as? NSMenuItem)?.tag ?? (sender as? NSToolbarItemGroup)?.selectedIndex ?? 0
         guard let tool = AnnotationTool(rawValue: index) else { return }
+        // The highlight control is a command, not a mode: it marks the selection and stays on 选择,
+        // so the next selection can be copied instead of highlighted again.
+        if tool == .highlight {
+            highlightSelection(sender)
+            suppressToolSelection = true
+            toolGroup?.selectedIndex = state.tool.rawValue
+            suppressToolSelection = false
+            return
+        }
         // Choosing a markup tool with text already selected marks that text right away.
-        if let type = tool.markupType, let selection = pdfView.currentSelection, !(selection.string ?? "").isEmpty {
-            editor.addMarkup(type, for: selection)
-            pdfView.clearSelection()
+        if let type = tool.markupType, let view = readerViewForMarkup(), let selection = view.currentSelection {
+            view.editor?.addMarkup(type, for: selection)
+            view.clearSelection()
         }
         state.tool = state.tool == tool && sender is NSMenuItem ? .select : tool
+    }
+
+    /// ⌃⌘H. Marks the focused pane's selection. During 对照阅读 the same lines are also marked
+    /// on the other pane, because the translation keeps the original layout.
+    @objc func highlightSelection(_ sender: Any?) {
+        guard let view = readerViewForMarkup(), let selection = view.currentSelection else { return }
+        applyHighlight(selection, in: view)
+    }
+
+    private func applyHighlight(_ selection: PDFSelection, in view: ReaderPDFView) {
+        let lines = selection.selectionsByLine()
+        view.editor?.addMarkup(.highlight, for: selection)
+        if state.parallelFileId != nil { mirrorHighlight(lines, from: view) }
+        view.clearSelection()
+    }
+
+    /// The reader pane that owns the current text selection: the focused one, else whichever has text.
+    private func readerViewForMarkup() -> ReaderPDFView? {
+        let focused = focusedReaderPDFView()
+        if let focused, !(focused.currentSelection?.string ?? "").isEmpty { return focused }
+        return [pdfView, content.parallelView].compactMap { $0 }.first { !($0.currentSelection?.string ?? "").isEmpty }
+    }
+
+    private func focusedReaderPDFView() -> ReaderPDFView? {
+        var responder: NSResponder? = window?.firstResponder
+        while let current = responder {
+            if let view = current as? ReaderPDFView { return view }
+            guard let view = current as? NSView else { return nil }
+            responder = view.superview
+        }
+        return nil
+    }
+
+    /// Copies each highlighted line's rectangle onto the same page of the other document.
+    private func mirrorHighlight(_ lines: [PDFSelection], from source: ReaderPDFView) {
+        guard let other = source === pdfView ? content.parallelView : pdfView,
+              let otherEditor = other.editor, let otherDocument = other.document else { return }
+        let mirrored = PDFSelection(document: otherDocument)
+        for line in lines {
+            for page in line.pages {
+                guard let index = source.document?.index(for: page), let otherPage = otherDocument.page(at: index) else { continue }
+                let rect = line.bounds(for: page)
+                guard rect.width > 0.5, rect.height > 0.5, let piece = otherPage.selection(for: rect),
+                      !(piece.string ?? "").isEmpty else { continue }
+                mirrored.add(piece)
+            }
+        }
+        guard !mirrored.pages.isEmpty else { return }
+        otherEditor.addMarkup(.highlight, for: mirrored)
     }
 
     @objc func selectColor(_ sender: Any?) {
@@ -656,7 +801,15 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
 
     private func choose(_ color: AnnotationColor) {
         state.color = color
-        if let annotation = pdfView.selectedAnnotation { editor.setColor(annotation, color) }
+        if let (view, annotation) = selectedAnnotation() { view.editor?.setColor(annotation, color) }
+    }
+
+    /// The annotation selected in the focused pane, or in either pane if focus is elsewhere.
+    private func selectedAnnotation() -> (ReaderPDFView, PDFAnnotation)? {
+        for view in [focusedReaderPDFView(), pdfView, content.parallelView].compactMap({ $0 }) {
+            if let annotation = view.selectedAnnotation { return (view, annotation) }
+        }
+        return nil
     }
 
     static let colorMenuIdentifier = NSUserInterfaceItemIdentifier("readerColorMenu")
@@ -672,17 +825,18 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
     }
 
     @objc func addSelectionToNote(_ sender: Any?) {
-        if let selection = pdfView.currentSelection, let text = selection.string, !text.isEmpty {
-            let index = selection.pages.first.flatMap { pdfView.document?.index(for: $0) } ?? state.pageIndex
+        let view = readerViewForMarkup() ?? focusedReaderPDFView() ?? pdfView
+        if let selection = view.currentSelection, let text = selection.string, !text.isEmpty {
+            let index = selection.pages.first.flatMap { view.document?.index(for: $0) } ?? state.pageIndex
             addToNote(AnnotationEditor.clean(text), pageIndex: index)
-        } else if let annotation = pdfView.selectedAnnotation, let text = AnnotationEditor.text(of: annotation),
-                  let page = annotation.page, let index = pdfView.document?.index(for: page) {
+        } else if let (view, annotation) = selectedAnnotation(), let text = AnnotationEditor.text(of: annotation),
+                  let page = annotation.page, let index = view.document?.index(for: page) {
             addToNote(text, pageIndex: index)
         }
     }
 
     @objc func deleteSelectedAnnotation(_ sender: Any?) {
-        if let annotation = pdfView.selectedAnnotation { editor.remove(annotation) }
+        if let (view, annotation) = selectedAnnotation() { view.editor?.remove(annotation) }
     }
 
     @objc func delete(_ sender: Any?) { deleteSelectedAnnotation(sender) }
@@ -696,6 +850,8 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
         case #selector(selectTool(_:)):
             menuItem.state = state.tool.rawValue == menuItem.tag ? .on : .off
             return true
+        case #selector(highlightSelection(_:)):
+            return !isEditingText && readerViewForMarkup() != nil
         case #selector(selectColor(_:)):
             menuItem.state = AnnotationColor.allCases.firstIndex(of: state.color) == menuItem.tag ? .on : .off
             return true
@@ -722,9 +878,9 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             menuItem.state = state.parallelFileId != nil ? .on : .off
             return state.parallelFileId != nil || translationFile != nil
         case #selector(addSelectionToNote(_:)):
-            return !(pdfView.currentSelection?.string ?? "").isEmpty || pdfView.selectedAnnotation != nil
+            return readerViewForMarkup() != nil || selectedAnnotation() != nil
         case #selector(deleteSelectedAnnotation(_:)), #selector(delete(_:)):
-            return pdfView.selectedAnnotation != nil
+            return selectedAnnotation() != nil
         default:
             return super.validateMenuItem(menuItem)
         }
@@ -772,9 +928,14 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             group.paletteLabel = String(localized: "批注工具")
             group.selectedIndex = state.tool.rawValue
             for (index, tool) in tools.enumerated() {
-                group.subitems[index].toolTip = String(localized: "\(tool.title)（⌃⌘\(tool.keyEquivalent.uppercased())）")
+                group.subitems[index].toolTip = tool == .highlight
+                    ? String(localized: "高亮所选文字（⌃⌘H）")
+                    : String(localized: "\(tool.title)（⌃⌘\(tool.keyEquivalent.uppercased())）")
             }
             group.controlRepresentation = .expanded
+            // A wide group used to jump into the overflow menu as soon as it no longer fit whole,
+            // leaving empty flexible space in a split window. Keep the tools and let search yield first.
+            group.visibilityPriority = .high
             toolGroup = group
             return group
         case .readerColor:
@@ -788,6 +949,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             item.paletteLabel = String(localized: "批注颜色")
             item.toolTip = String(localized: "批注颜色")
             item.image = Self.colorSwatch(state.color)
+            item.visibilityPriority = .high
             colorItem = item
             return item
         case .readerTranslate:
@@ -813,6 +975,7 @@ final class ReaderWindowController: FolioWindowController, NSToolbarDelegate, NS
             item.preferredWidthForSearchField = 160
             // The field would otherwise stretch over all free toolbar space.
             item.searchField.widthAnchor.constraint(lessThanOrEqualToConstant: 200).isActive = true
+            item.visibilityPriority = .low
             searchItem = item
             return item
         case .readerPrint:
@@ -852,7 +1015,7 @@ extension NSToolbarItem.Identifier {
 final class ReaderContentViewController: NSViewController, NSSplitViewDelegate {
     let pdfView: ReaderPDFView
     private let splitView = NSSplitView()
-    private var parallelView: PDFView?
+    private(set) var parallelView: ReaderPDFView?
     private var isSyncing = false
 
     init(pdfView: ReaderPDFView) {
@@ -909,23 +1072,32 @@ final class ReaderContentViewController: NSViewController, NSSplitViewDelegate {
         (view.window?.windowController as? ReaderWindowController)?.restorePosition()
     }
 
-    func showParallel(_ url: URL?) {
-        parallelView?.removeFromSuperview()
-        parallelView = nil
-        guard let url, let data = try? Data(contentsOf: url, options: .alwaysMapped), let document = PDFDocument(data: data) else { return }
-        let view = PDFView()
-        view.document = document
+    /// Installs the translation beside the original. Pass nil to close it.
+    /// The caller sets the document delegate before the pages are created.
+    @discardableResult
+    func showParallel(_ document: PDFDocument?) -> ReaderPDFView? {
+        if let parallelView {
+            NotificationCenter.default.removeObserver(self, name: .PDFViewPageChanged, object: parallelView)
+            parallelView.removeFromSuperview()
+            self.parallelView = nil
+        }
+        guard let document else { return nil }
+        let view = ReaderPDFView()
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displaysPageBreaks = true
         view.setAccessibilityIdentifier("parallelPDFView")
+        view.document = document
         splitView.addArrangedSubview(view)
         // A view added later starts with zero width: split the space evenly.
         splitView.layoutSubtreeIfNeeded()
         splitView.setPosition(splitView.bounds.width / 2, ofDividerAt: 0)
         parallelView = view
         NotificationCenter.default.addObserver(self, selector: #selector(parallelPageChanged(_:)), name: .PDFViewPageChanged, object: view)
+        return view
     }
+
+    var pdfPanes: [PDFView] { splitView.arrangedSubviews.compactMap { $0 as? PDFView } }
 
     /// Keeps both sides on the same page index.
     func syncParallel(from source: PDFView) {

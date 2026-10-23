@@ -43,13 +43,16 @@ enum ReaderMenus {
         go.addItem(item(String(localized: "前往页面…"), #selector(ReaderWindowController.goToPageNumber(_:)), "g", [.command, .option]))
 
         let annotate = NSMenu(title: String(localized: "批注"))
-        for tool in AnnotationTool.allCases {
+        for tool in AnnotationTool.allCases where tool != .highlight {
             let entry = item(tool.title, #selector(ReaderWindowController.selectTool(_:)), tool.keyEquivalent, [.command, .control])
             entry.tag = tool.rawValue
             entry.image = NSImage(systemSymbolName: tool.symbol, accessibilityDescription: nil)
             annotate.addItem(entry)
             if tool == .select { annotate.addItem(.separator()) }
         }
+        let highlight = item(String(localized: "高亮所选文字"), #selector(ReaderWindowController.highlightSelection(_:)), "h", [.command, .control])
+        highlight.image = NSImage(systemSymbolName: AnnotationTool.highlight.symbol, accessibilityDescription: nil)
+        annotate.insertItem(highlight, at: 2)
         annotate.addItem(.separator())
         let colors = NSMenu(title: String(localized: "颜色"))
         for (index, color) in AnnotationColor.allCases.enumerated() {

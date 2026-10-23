@@ -52,6 +52,15 @@ enum AnnotationTool: Int, CaseIterable {
         default: nil
         }
     }
+
+    /// Underline and strike-out mark the selection when the mouse goes up.
+    /// Highlight does not: the selection stays available to copy until ⌃⌘H.
+    var marksSelectionOnMouseUp: Bool {
+        switch self {
+        case .underline, .strikeOut: true
+        default: false
+        }
+    }
 }
 
 /// Pages of the reader sidebar (READER-02).
@@ -85,6 +94,8 @@ struct AnnotationRow: Identifiable, Equatable {
     let color: NSColor
     let text: String
     let comment: String
+    /// "译文" when the annotation lives on the parallel translation; empty for the original.
+    var pane: String = ""
 }
 
 /// One find result as listed in the sidebar.
