@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-23
+
 ### 新增
 
 - 阅读器：选中文字后按 ⇧⌘H 再高亮，方便先复制去查资料；对照阅读时同一处会同时标在原文和译文上，译文也可以单独批注
@@ -30,5 +32,6 @@
 - 中英双语界面（默认跟随系统语言，可在设置中切换），浏览器插件同样支持英文
 - 支持 macOS 14 Sonoma 及以上；在 macOS 26 上使用 Liquid Glass 外观
 
-[Unreleased]: https://github.com/Alonemo-Nnqc/Folio/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/none-nul/Folio/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/none-nul/Folio/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Alonemo-Nnqc/Folio/releases/tag/v1.0.0
