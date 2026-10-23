@@ -237,12 +237,17 @@ private struct ShortcutCapture: NSViewRepresentable {
             guard monitor == nil else { return }
             let bridge = bridge
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                MainActor.assumeIsolated { () -> NSEvent? in
-                    guard let view = bridge.view, view.recording else { return event }
-                    if event.isARepeat { return nil }
+                // assumeIsolated can only return a Sendable value, and NSEvent's Sendable
+                // conformance is unavailable. The monitor itself runs on the main thread.
+                let pointer = Unmanaged.passUnretained(event).toOpaque()
+                let swallow = MainActor.assumeIsolated { () -> Bool in
+                    let event = Unmanaged<NSEvent>.fromOpaque(pointer).takeUnretainedValue()
+                    guard let view = bridge.view, view.recording else { return false }
+                    if event.isARepeat { return true }
                     view.coordinator?.onEvent(event)
-                    return nil
+                    return true
                 }
+                return swallow ? nil : event
             }
         }
 
